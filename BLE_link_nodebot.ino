@@ -42,13 +42,17 @@ void setup() {
   Serial.println("NodeBot BLE Serial Translator - Nebarnix");
 
   // start scanning for peripherals
+  
+  BLE.setTxPower(4); //set MAX POWER!
+  Serial.println("Power set to 4dbm");
   BLE.scanForUuid("bada5555-e91f-1337-a49b-8675309fb099");
+  Serial.println("Scanning for UID bada5555-e91f-1337-a49b-8675309fb099");
 }
 
 void loop() {
   // check if a peripheral has been discovered
   BLEDevice peripheral = BLE.available();
-
+  
   if (peripheral) {
     // discovered a peripheral, print out address, local name, and advertised service
     Serial.print("Found ");
@@ -140,7 +144,9 @@ if (!digitalChar) {
 //    return;
 //  }
 //  
-
+  unsigned char fixspeed = 0;
+  unsigned char SpeedAssemetric = 0; //If the speed is not symmetric between the two tires, IE a 'dirty' state
+  unsigned char SpeedState=0; //0 - crawl, 1 - slow, 2 - fast
   unsigned char FWD[] = {8,0,7,1,5,0,4,1};
   //FWL FWR RVR RVL
   unsigned char REV[] = {8,1,7,0,5,1,4,0};
@@ -149,11 +155,19 @@ if (!digitalChar) {
   unsigned char STP[] = {8,0,7,0,5,0,4,0};
    
   unsigned char CRL[] = {9,64,0,3,64,0};
+  unsigned char CRLL[] = {9,32,0,3,127,0};
+  unsigned char CRLR[] = {9,127,0,3,32,0};
+  
   unsigned char SLW[] = {9,127,0,3,127,0};
+  unsigned char SLWL[] = {9,64,0,3,200,0};
+  unsigned char SLWR[] = {9,200,0,3,64,0};
+  
   unsigned char FST[] = {9,255,0,3,255,0};
+  unsigned char FSTL[] = {9,100,0,3,255,0};
+  unsigned char FSTR[] = {9,255,0,3,100,0};
 
-  unsigned char SIN[] = {6,10};
-  unsigned char SOT[] = {6,170};
+  unsigned char SIN[] = {6,5};
+  unsigned char SOT[] = {6,180};
   
   unsigned char SERVO_CONFIG1[] = {244, 6, 4};
   unsigned char SERVO_CONFIG2[] = {112, 6, 0, 0, 180, 0};
@@ -177,73 +191,156 @@ if (!digitalChar) {
    //if(!analogChar.setValue(FWD_A,6))
    //      Serial.println("Write Failed...");
    readString = "";
-   while (peripheral.connected()) //wait for a string to come! 
+   unsigned long timeout = millis();
+   while (peripheral.connected() ) //wait for a string to come but allow a timeout! 
       {
-      delay(3);  //delay to allow buffer to fill 
+      //delay(3);  //delay to allow buffer to fill 
       if (Serial.available() > 0) 
           {
           char c = Serial.read();  //gets one byte from serial buffer          
           if(c == '\n' || c == '\r' || c == ';')
+            {
+            //Don't do this if we're emitting multiple commands per line!
+            //while(Serial.available()) Serial.read(); //Clear out any commands piling up in the input buffer (experimental)(only use with constant stream of commands)
             break;
+            }
           readString += c; //makes the string readString
           }
+      if((millis()-timeout) > 250 )    
+        {
+        readString = "NUL"; //Uncomment this if you're emitting a constant stream of commands. Use 'emit on changed' for pagenodes to avoid buffer backup
+        break;
+        }
       }
+
+  fixspeed = 0;   
   if(readString == "FWD")
     {
-    Serial.println("Going forward!");
-    digitalChar.setValue(FWD,8); //initilize to crawl    
+    Serial.println("Fwd");
+    digitalChar.setValue(FWD,8);     
+    fixspeed = 1; //Requires even speed
+    }
+  else if(readString == "RVR")
+    {
+    Serial.println("Rev+Rht");
+    digitalChar.setValue(REV,8);
+    SpeedAssemetric = 1; //dirty the assymetric wheel flag
+    switch(SpeedState)
+      { 
+        case 0: analogChar.setValue(CRLR,6); break;
+        case 1: analogChar.setValue(SLWR,6); break;
+        case 2: analogChar.setValue(FSTR,6); break;        
+      }        
+    }
+  else if(readString == "RVL")
+    {
+    Serial.println("Rev+Lft");
+    digitalChar.setValue(REV,8);        
+    SpeedAssemetric = 1; //dirty the assymetric wheel flag
+    switch(SpeedState)
+      { 
+        case 0: analogChar.setValue(CRLL,6); break;
+        case 1: analogChar.setValue(SLWL,6); break;
+        case 2: analogChar.setValue(FSTL,6); break;        
+      }
+    }
+  else if(readString == "FWR")
+    {
+    Serial.println("Fwd+Rht");
+    digitalChar.setValue(FWD,8);     
+    SpeedAssemetric = 1; //dirty the assymetric wheel flag
+    switch(SpeedState)
+      { 
+        case 0: analogChar.setValue(CRLR,6); break;
+        case 1: analogChar.setValue(SLWR,6); break;
+        case 2: analogChar.setValue(FSTR,6); break;        
+      }
+    }
+  else if(readString == "FWL")  
+    {
+    Serial.println("Fwd+Lft");
+    digitalChar.setValue(FWD,8); 
+    SpeedAssemetric = 1; //dirty the assymetric wheel flag
+    switch(SpeedState)
+      { 
+        case 0: analogChar.setValue(CRLL,6); break;
+        case 1: analogChar.setValue(SLWL,6); break;
+        case 2: analogChar.setValue(FSTL,6); break;        
+      }    
     }
   else if(readString == "REV")
     {
-    Serial.println("Going backward!");
-    digitalChar.setValue(REV,8); //initilize to crawl     
+    Serial.println("Rev");
+    digitalChar.setValue(REV,8);
+    fixspeed = 1; //Requires even speed
     }
   else if(readString == "LFT")
     {
-    Serial.println("Going left!");
-    digitalChar.setValue(LFT,8); //initilize to crawl     
+    Serial.println("Lft");
+    digitalChar.setValue(LFT,8);
+    fixspeed = 1; //Requires even speed
     }
   else if(readString == "RGT")
     {
-    Serial.println("Going right!");
-    digitalChar.setValue(RGT,8); //initilize to crawl     
+    Serial.println("Rght");
+    digitalChar.setValue(RGT,8);
+    fixspeed = 1; //Requires even speed
     }
   else if(readString == "STP")
     {
-    Serial.println("Stopping!");
-    digitalChar.setValue(STP,8); //initilize to crawl     
+    Serial.println("Rrch");
+    digitalChar.setValue(STP,8); 
     }
   else if(readString == "SLW")
     {
-    Serial.println("Going Slowly!");
-    analogChar.setValue(SLW,6); //initilize to crawl     
+    SpeedState = 1;
+    Serial.println("Slow");
+    analogChar.setValue(SLW,6); 
     }
   else if(readString == "CRL")
     {
-    Serial.println("Going REALLY Slowly!");
+    SpeedState = 0;
+    Serial.println("crawl");
     analogChar.setValue(CRL,6); //initilize to crawl     
     }
   else if(readString == "FST")
     {
-    Serial.println("Going FAST!");
-    analogChar.setValue(FST,6); //initilize to crawl     
+    SpeedState = 2;  
+    Serial.println("Zoom");
+    analogChar.setValue(FST,6);
     }
   else if(readString == "SIN")
     {
     Serial.println("Undeploying Servo!");
-    analogChar.setValue(SIN,2); //initilize to crawl     
+    analogChar.setValue(SIN,2); 
     }
   else if(readString == "SOT")
     {
     Serial.println("Deploying Servo!");
-    analogChar.setValue(SOT,2); //initilize to crawl     
+    analogChar.setValue(SOT,2);
     }    
+  else if(readString == "NUL");
   else
     {
-    Serial.println("Unrecognized command :(");
+    Serial.print(readString);
+    Serial.println(" <- Unrecognized command :(");
     }
+  
+  if(fixspeed == 1 && SpeedAssemetric == 1) //if we just came out of a turn, even up the wheels again
+    {
+    Serial.println("Fix Spd");
+    switch(SpeedState)
+      { 
+        case 0: analogChar.setValue(CRL,6); break;
+        case 1: analogChar.setValue(SLW,6); break;
+        case 2: analogChar.setValue(FST,6); break;        
+      }
+      SpeedAssemetric = 0;
+    } 
   }
-
+  
+   
+    
   Serial.println("Peripheral disconnected");
 }
 
