@@ -78,7 +78,7 @@ void controlLed(BLEDevice peripheral) {
   Serial.println("Connecting ...");
 
   if (peripheral.connect()) {
-    Serial.println("Connected");
+    Serial.println("!Connected");
   } else {
     Serial.println("Failed to connect!");
     return;
@@ -147,24 +147,30 @@ if (!digitalChar) {
   unsigned char fixspeed = 0;
   unsigned char SpeedAssemetric = 0; //If the speed is not symmetric between the two tires, IE a 'dirty' state
   unsigned char SpeedState=0; //0 - crawl, 1 - slow, 2 - fast
-  unsigned char FWD[] = {8,0,7,1,5,0,4,1};
+  
+  unsigned char TX1[] = {120,0};
+  unsigned char TX2[] = {120,1};
+  unsigned char TX3[] = {120,2};
+  unsigned char TX4[] = {120,3};
+  
+  unsigned char REV[] = {8,0,7,1,5,0,4,1};
   //FWL FWR RVR RVL
-  unsigned char REV[] = {8,1,7,0,5,1,4,0};
+  unsigned char FWD[] = {8,1,7,0,5,1,4,0};
   unsigned char LFT[] = {8,1,7,0,5,0,4,1};
   unsigned char RGT[] = {8,0,7,1,5,1,4,0};
   unsigned char STP[] = {8,0,7,0,5,0,4,0};
    
   unsigned char CRL[] = {9,64,0,3,64,0};
-  unsigned char CRLL[] = {9,32,0,3,127,0};
-  unsigned char CRLR[] = {9,127,0,3,32,0};
+  unsigned char CRLR[] = {9,32,0,3,127,0};
+  unsigned char CRLL[] = {9,127,0,3,32,0};
   
   unsigned char SLW[] = {9,127,0,3,127,0};
-  unsigned char SLWL[] = {9,64,0,3,200,0};
-  unsigned char SLWR[] = {9,200,0,3,64,0};
+  unsigned char SLWR[] = {9,64,0,3,200,0};
+  unsigned char SLWL[] = {9,200,0,3,64,0};
   
   unsigned char FST[] = {9,255,0,3,255,0};
-  unsigned char FSTL[] = {9,100,0,3,255,0};
-  unsigned char FSTR[] = {9,255,0,3,100,0};
+  unsigned char FSTR[] = {9,100,0,3,255,0};
+  unsigned char FSTL[] = {9,255,0,3,100,0};
 
   unsigned char SIN[] = {6,5};
   unsigned char SOT[] = {6,180};
@@ -214,7 +220,23 @@ if (!digitalChar) {
       }
 
   fixspeed = 0;   
-  if(readString == "FWD")
+  if(readString == "TX1")
+    {
+    digitalChar.setValue(TX1,2);
+    }
+  else if(readString == "TX2")
+    {
+    digitalChar.setValue(TX2,2);
+    }
+  else if(readString == "TX3")
+    {
+    digitalChar.setValue(TX3,2);
+    }
+  else if(readString == "TX4")
+    {
+    digitalChar.setValue(TX4,2);
+    }    
+  else if(readString == "FWD")
     {
     Serial.println("Fwd");
     digitalChar.setValue(FWD,8);     
@@ -319,7 +341,7 @@ if (!digitalChar) {
     Serial.println("Deploying Servo!");
     analogChar.setValue(SOT,2);
     }    
-  else if(readString == "NUL");
+  else if(readString == "NUL" || !peripheral.connected());
   else
     {
     Serial.print(readString);
@@ -337,11 +359,9 @@ if (!digitalChar) {
       }
       SpeedAssemetric = 0;
     } 
-  }
-  
-   
+  }  
     
-  Serial.println("Peripheral disconnected");
+  Serial.println("!Disconnected");
 }
 
 /*
